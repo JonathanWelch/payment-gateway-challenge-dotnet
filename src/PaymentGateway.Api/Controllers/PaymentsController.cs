@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-
 using PaymentGateway.Api.Models.Responses;
 using PaymentGateway.Api.Services;
 
@@ -26,6 +25,6 @@ public class PaymentsController : ControllerBase
             return NotFound();
         }
 
-        return new OkObjectResult(payment);
+        return Ok(payment);
     }
 }
