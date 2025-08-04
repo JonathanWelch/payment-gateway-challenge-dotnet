@@ -9,11 +9,12 @@ using PaymentGateway.Api.Services;
 
 namespace PaymentGateway.Api.Tests;
 
+[TestFixture]
 public class PaymentsControllerTests
 {
     private readonly Random _random = new();
     
-    [Fact]
+    [Test]
     public async Task RetrievesAPaymentSuccessfully()
     {
         // Arrange
@@ -41,11 +42,11 @@ public class PaymentsControllerTests
         var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
         
         // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.NotNull(paymentResponse);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(paymentResponse, Is.Not.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task Returns404IfPaymentNotFound()
     {
         // Arrange
@@ -56,6 +57,6 @@ public class PaymentsControllerTests
         var response = await client.GetAsync($"/api/Payments/{Guid.NewGuid()}");
         
         // Assert
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
     }
 }
