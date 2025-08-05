@@ -36,10 +36,6 @@ public class PaymentsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<PostPaymentResponse>> CreatePaymentAsync([FromBody] PostPaymentRequest paymentRequest)
     {
-        if (!ModelState.IsValid)
-        {
-            return UnprocessableEntity(ModelState);
-        }
 
         var response = new PostPaymentResponse
         {
