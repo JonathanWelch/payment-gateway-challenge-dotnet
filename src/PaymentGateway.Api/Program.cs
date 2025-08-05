@@ -21,6 +21,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<PaymentsRepository>();
+builder.Services.AddScoped<IPaymentsService, PaymentsService>();
 
 var app = builder.Build();
 

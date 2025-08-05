@@ -2,7 +2,6 @@
 
 using Microsoft.AspNetCore.Mvc;
 
-using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Models.Requests;
 using PaymentGateway.Api.Models.Responses;
 using PaymentGateway.Api.Services;
@@ -13,17 +12,17 @@ namespace PaymentGateway.Api.Controllers;
 [ApiController]
 public class PaymentsController : ControllerBase
 {
-    private readonly PaymentsRepository _paymentsRepository;
+    private readonly IPaymentsService _paymentsService;
 
-    public PaymentsController(PaymentsRepository paymentsRepository)
+    public PaymentsController(IPaymentsService paymentsService)
     {
-        _paymentsRepository = paymentsRepository;
+        _paymentsService = paymentsService;
     }
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PostPaymentResponse?>> GetPaymentAsync(Guid id)
     {
-        var payment = _paymentsRepository.Get(id);
+        var payment = await _paymentsService.GetPaymentAsync(id);
 
         if (payment == null)
         {
@@ -36,19 +35,9 @@ public class PaymentsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<PostPaymentResponse>> CreatePaymentAsync([FromBody] PostPaymentRequest paymentRequest)
     {
+        var paymentResponse = await _paymentsService.CreatePaymentAsync(paymentRequest);
 
-        var response = new PostPaymentResponse
-        {
-            Id = Guid.NewGuid(),
-            ExpiryYear = paymentRequest.ExpiryYear,
-            ExpiryMonth = paymentRequest.ExpiryMonth,
-            Amount = paymentRequest.Amount,
-            CardNumberLastFour = Int32.Parse(paymentRequest.CardNumber[^4..]),
-            Currency = paymentRequest.Currency,
-            Status = PaymentStatus.Authorized
-        };
-
-        return new ObjectResult(response)
+        return new ObjectResult(paymentResponse)
         {
             StatusCode = (int?)HttpStatusCode.Created
         };

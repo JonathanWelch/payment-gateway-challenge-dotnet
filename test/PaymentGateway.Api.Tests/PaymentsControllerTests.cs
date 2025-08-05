@@ -26,7 +26,8 @@ public class PaymentsControllerTests
         _webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         _client = _webApplicationFactory.WithWebHostBuilder(builder =>
                 builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(_paymentsRepository)))
+                    .AddSingleton(_paymentsRepository)
+                    .AddScoped<IPaymentsService, PaymentsService>()))
             .CreateClient();
     }
 
@@ -258,6 +259,33 @@ public class PaymentsControllerTests
 
         // Assert
         await AssertValidationErrorAsync(response, "ExpiryYear", "Card expiry must be in the future.");
+    }
+
+    [Test]
+    public async Task CreatesAndRetrievePaymentSuccessfully()
+    {
+        // Arrange
+        var paymentRequest = CreateValidPaymentRequest();
+
+        // Act
+        var httpPostResponse = await _client.PostAsJsonAsync($"/api/Payments", paymentRequest);
+        var postPaymentResponse = await httpPostResponse.Content.ReadFromJsonAsync<PostPaymentResponse>();
+
+        var httpGetResponse = await _client.GetAsync($"/api/Payments/{postPaymentResponse.Id}");
+        var paymentResponse = await httpGetResponse.Content.ReadFromJsonAsync<PostPaymentResponse>();
+
+        // Assert
+        Assert.That(httpPostResponse.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+        Assert.That(httpGetResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(paymentResponse, Is.Not.Null);
+        Assert.That(paymentResponse.Id, Is.Not.EqualTo(Guid.Empty));
+        Assert.That(paymentResponse.Amount, Is.EqualTo(paymentRequest.Amount));
+        int expectedCardNumberLastFour = 5678;
+        Assert.That(paymentResponse.CardNumberLastFour, Is.EqualTo(expectedCardNumberLastFour));
+        Assert.That(paymentResponse.ExpiryMonth, Is.EqualTo(paymentRequest.ExpiryMonth));
+        Assert.That(paymentResponse.ExpiryYear, Is.EqualTo(paymentRequest.ExpiryYear));
+        Assert.That(paymentResponse.Currency, Is.EqualTo(paymentRequest.Currency));
+        Assert.That(paymentResponse.Status, Is.EqualTo(PaymentStatus.Authorized));
     }
 
     private PostPaymentRequest CreateValidPaymentRequest(
