@@ -15,7 +15,28 @@ namespace PaymentGateway.Api.Tests;
 public class PaymentsControllerTests
 {
     private readonly Random _random = new();
-    
+    private PaymentsRepository _paymentsRepository;
+    private WebApplicationFactory<PaymentsController> _webApplicationFactory;
+    private HttpClient _client;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _paymentsRepository = new PaymentsRepository();
+        _webApplicationFactory = new WebApplicationFactory<PaymentsController>();
+        _client = _webApplicationFactory.WithWebHostBuilder(builder =>
+                builder.ConfigureServices(services => ((ServiceCollection)services)
+                    .AddSingleton(_paymentsRepository)))
+            .CreateClient();
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        _client.Dispose();
+        _webApplicationFactory.Dispose();
+    }
+
     [Test]
     public async Task RetrievesAPaymentSuccessfully()
     {
@@ -30,17 +51,10 @@ public class PaymentsControllerTests
             Currency = "GBP"
         };
 
-        var paymentsRepository = new PaymentsRepository();
-        paymentsRepository.Add(payment);
-
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services => ((ServiceCollection)services)
-                .AddSingleton(paymentsRepository)))
-            .CreateClient();
+        _paymentsRepository.Add(payment);
 
         // Act
-        var response = await client.GetAsync($"/api/Payments/{payment.Id}");
+        var response = await _client.GetAsync($"/api/Payments/{payment.Id}");
         var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
         
         // Assert
@@ -51,12 +65,8 @@ public class PaymentsControllerTests
     [Test]
     public async Task Returns404IfPaymentNotFound()
     {
-        // Arrange
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.CreateClient();
-        
         // Act
-        var response = await client.GetAsync($"/api/Payments/{Guid.NewGuid()}");
+        var response = await _client.GetAsync($"/api/Payments/{Guid.NewGuid()}");
         
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
@@ -68,25 +78,10 @@ public class PaymentsControllerTests
     public async Task CreatesPaymentSuccessfully(string validCurrency)
     {
         // Arrange
-        var paymentsRepository = new PaymentsRepository();
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(paymentsRepository)))
-            .CreateClient();
-
-        var paymentRequest = new PostPaymentRequest
-        {
-            CardNumber = "1234567812345678",
-            ExpiryMonth = 12,
-            ExpiryYear = 2025,
-            Currency = validCurrency,
-            Amount = 1000,
-            Cvv = 123
-        };
+        var paymentRequest = CreateValidPaymentRequest(currency: validCurrency);
 
         // Act
-        var response = await client.PostAsJsonAsync($"/api/Payments", paymentRequest);
+        var response = await _client.PostAsJsonAsync($"/api/Payments", paymentRequest);
         var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
 
         // Assert
@@ -107,33 +102,13 @@ public class PaymentsControllerTests
     public async Task Returns422IfCardNumberNotNumeric(string invalidCardNumber)
     {
         // Arrange
-        var paymentsRepository = new PaymentsRepository();
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(paymentsRepository)))
-            .CreateClient();
-
-        var request = new PostPaymentRequest
-        {
-            CardNumber = invalidCardNumber,
-            ExpiryMonth = 12,
-            ExpiryYear = 2025,
-            Currency = "GBP",
-            Amount = 1000,
-            Cvv = 123
-        };
+        var request = CreateValidPaymentRequest(cardNumber: invalidCardNumber);
 
         // Act
-        var response = await client.PostAsJsonAsync($"/api/Payments", request);
-        var errorResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string[]>>();
+        var response = await _client.PostAsJsonAsync($"/api/Payments", request);
 
         // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
-        Assert.That(errorResponse, Is.Not.Null);
-        Assert.That(errorResponse, Contains.Key("CardNumber"));
-        var cardNumberErrors = errorResponse["CardNumber"];
-        Assert.That(cardNumberErrors, Contains.Item("Card number must only contain numeric characters."));
+        await AssertValidationErrorAsync(response, "CardNumber", "Card number must only contain numeric characters.");
     }
 
     [TestCase("")]
@@ -144,46 +119,19 @@ public class PaymentsControllerTests
     public async Task Returns422IfCardNumberWrongLength(string invalidCardNumber)
     {
         // Arrange
-        var paymentsRepository = new PaymentsRepository();
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(paymentsRepository)))
-            .CreateClient();
-
-        var request = new PostPaymentRequest
-        {
-            CardNumber = invalidCardNumber,
-            ExpiryMonth = 12,
-            ExpiryYear = 2025,
-            Currency = "GBP",
-            Amount = 1000,
-            Cvv = 123
-        };
+        var request = CreateValidPaymentRequest(cardNumber: invalidCardNumber);
 
         // Act
-        var response = await client.PostAsJsonAsync($"/api/Payments", request);
-        var errorResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string[]>>();
+        var response = await _client.PostAsJsonAsync($"/api/Payments", request);
 
         // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
-        Assert.That(errorResponse, Is.Not.Null);
-        Assert.That(errorResponse, Contains.Key("CardNumber"));
-        var cardNumberErrors = errorResponse["CardNumber"];
-        Assert.That(cardNumberErrors, Contains.Item("Card number must be between 14-19 characters long."));
+        await AssertValidationErrorAsync(response, "CardNumber", "Card number must be between 14-19 characters long.");
     }
 
     [Test]
     public async Task Returns422IfCardNumberMissing()
     {
         // Arrange
-        var paymentsRepository = new PaymentsRepository();
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(paymentsRepository)))
-            .CreateClient();
-
         var request = new PostPaymentRequest
         {
             ExpiryMonth = 12,
@@ -194,28 +142,17 @@ public class PaymentsControllerTests
         };
 
         // Act
-        var response = await client.PostAsJsonAsync($"/api/Payments", request);
-        var errorResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string[]>>();
+        var response = await _client.PostAsJsonAsync($"/api/Payments", request);
 
         // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
-        Assert.That(errorResponse, Is.Not.Null);
-        Assert.That(errorResponse, Contains.Key("CardNumber"));
-        var cardNumberErrors = errorResponse["CardNumber"];
-        Assert.That(cardNumberErrors, Contains.Item("Card number is required."));
+        await AssertValidationErrorAsync(response, "CardNumber", "Card number is required.");
+
     }
 
     [Test]
     public async Task Returns422IfExpiryMonthMissing()
     {
         // Arrange
-        var paymentsRepository = new PaymentsRepository();
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(paymentsRepository)))
-            .CreateClient();
-
         var request = new PostPaymentRequest
         {
             CardNumber = "1234567812345678",
@@ -226,15 +163,10 @@ public class PaymentsControllerTests
         };
 
         // Act
-        var response = await client.PostAsJsonAsync($"/api/Payments", request);
+        var response = await _client.PostAsJsonAsync($"/api/Payments", request);
 
         // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
-        var errorResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string[]>>();
-        Assert.That(errorResponse, Is.Not.Null);
-        Assert.That(errorResponse, Contains.Key("ExpiryMonth"));
-        var cardNumberErrors = errorResponse["ExpiryMonth"];
-        Assert.That(cardNumberErrors, Contains.Item("Expiry month must be between 1-12."));
+        await AssertValidationErrorAsync(response, "ExpiryMonth", "Expiry month must be between 1-12.");
     }
 
     [TestCase(0)]
@@ -243,33 +175,13 @@ public class PaymentsControllerTests
     public async Task Returns422IfExpiryMonthInvalid(int invalidExpiryMonth)
     {
         // Arrange
-        var paymentsRepository = new PaymentsRepository();
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(paymentsRepository)))
-            .CreateClient();
-
-        var request = new PostPaymentRequest
-        {
-            CardNumber = "1234567812345678",
-            ExpiryMonth = invalidExpiryMonth,
-            ExpiryYear = 2025,
-            Currency = "GBP",
-            Amount = 1000,
-            Cvv = 123
-        };
+        var request = CreateValidPaymentRequest(expiryMonth: invalidExpiryMonth);
 
         // Act
-        var response = await client.PostAsJsonAsync($"/api/Payments", request);
+        var response = await _client.PostAsJsonAsync($"/api/Payments", request);
 
         // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
-        var errorResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string[]>>();
-        Assert.That(errorResponse, Is.Not.Null);
-        Assert.That(errorResponse, Contains.Key("ExpiryMonth"));
-        var cardNumberErrors = errorResponse["ExpiryMonth"];
-        Assert.That(cardNumberErrors, Contains.Item("Expiry month must be between 1-12."));
+        await AssertValidationErrorAsync(response, "ExpiryMonth", "Expiry month must be between 1-12.");
     }
 
     [TestCase("EGP")]
@@ -278,80 +190,32 @@ public class PaymentsControllerTests
     public async Task Returns422IfCurrencyInvalid(string invalidCurrency)
     {
         // Arrange
-        var paymentsRepository = new PaymentsRepository();
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(paymentsRepository)))
-            .CreateClient();
-
-        var request = new PostPaymentRequest
-        {
-            CardNumber = "1234567812345678",
-            ExpiryMonth = 12,
-            ExpiryYear = 2025,
-            Currency = invalidCurrency,
-            Amount = 1000,
-            Cvv = 123
-        };
+        var request = CreateValidPaymentRequest(currency: invalidCurrency);
 
         // Act
-        var response = await client.PostAsJsonAsync($"/api/Payments", request);
+        var response = await _client.PostAsJsonAsync($"/api/Payments", request);
 
         // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
-        var errorResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string[]>>();
-        Assert.That(errorResponse, Is.Not.Null);
-        Assert.That(errorResponse, Contains.Key("Currency"));
-        var cardNumberErrors = errorResponse["Currency"];
-        Assert.That(cardNumberErrors, Contains.Item("Currency must be GBP, USD or EUR."));
+        await AssertValidationErrorAsync(response, "Currency", "Currency must be GBP, USD or EUR.");
     }
 
     [Test]
     public async Task Returns422IfAmountInvalid()
     {
         // Arrange
-        var paymentsRepository = new PaymentsRepository();
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(paymentsRepository)))
-            .CreateClient();
-
-        var request = new PostPaymentRequest
-        {
-            CardNumber = "1234567812345678",
-            ExpiryMonth = 12,
-            ExpiryYear = 2025,
-            Currency = "GBP",
-            Amount = 0,
-            Cvv = 123
-        };
+        var request = CreateValidPaymentRequest(amount: 0);
 
         // Act
-        var response = await client.PostAsJsonAsync($"/api/Payments", request);
+        var response = await _client.PostAsJsonAsync($"/api/Payments", request);
 
         // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
-        var errorResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string[]>>();
-        Assert.That(errorResponse, Is.Not.Null);
-        Assert.That(errorResponse, Contains.Key("Amount"));
-        var cardNumberErrors = errorResponse["Amount"];
-        Assert.That(cardNumberErrors, Contains.Item("Amount must be an integer greater than 0."));
+        await AssertValidationErrorAsync(response, "Amount", "Amount must be an integer greater than 0.");
     }
-
 
     [Test]
     public async Task Returns422IfAmountMissing()
     {
         // Arrange
-        var paymentsRepository = new PaymentsRepository();
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(paymentsRepository)))
-            .CreateClient();
-
         var request = new PostPaymentRequest
         {
             CardNumber = "1234567812345678",
@@ -362,82 +226,71 @@ public class PaymentsControllerTests
         };
 
         // Act
-        var response = await client.PostAsJsonAsync($"/api/Payments", request);
+        var response = await _client.PostAsJsonAsync($"/api/Payments", request);
 
         // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
-        var errorResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string[]>>();
-        Assert.That(errorResponse, Is.Not.Null);
-        Assert.That(errorResponse, Contains.Key("Amount"));
-        var cardNumberErrors = errorResponse["Amount"];
-        Assert.That(cardNumberErrors, Contains.Item("Amount must be an integer greater than 0."));
+        await AssertValidationErrorAsync(response, "Amount", "Amount must be an integer greater than 0.");
     }
 
     [Test]
     public async Task Returns422IfCardExpired()
     {
         // Arrange
-        var paymentsRepository = new PaymentsRepository();
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(paymentsRepository)))
-            .CreateClient();
-
         var monthAgo = DateTime.Now.AddMonths(-1);
-        var request = new PostPaymentRequest
-        {
-            CardNumber = "1234567812345678",
-            ExpiryMonth = monthAgo.Month,
-            ExpiryYear = monthAgo.Year, 
-            Currency = "GBP",
-            Amount = 1000,
-            Cvv = 123
-        };
+        var request = CreateValidPaymentRequest(expiryMonth : monthAgo.Month, expiryYear: monthAgo.Year);
 
         // Act
-        var response = await client.PostAsJsonAsync($"/api/Payments", request);
-        var errorResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string[]>>();
+        var response = await _client.PostAsJsonAsync($"/api/Payments", request);
 
         // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
-        Assert.That(errorResponse, Is.Not.Null);
-        Assert.That(errorResponse, Contains.Key("ExpiryYear"));
-        var expiryErrors = errorResponse["ExpiryYear"];
-        Assert.That(expiryErrors, Contains.Item("Card expiry must be in the future."));
+        await AssertValidationErrorAsync(response, "ExpiryYear", "Card expiry must be in the future.");
     }
 
     [Test]
     public async Task Returns422IfCardExpiresThisMonth()
     {
         // Arrange
-        var paymentsRepository = new PaymentsRepository();
-        var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
-        var client = webApplicationFactory.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(paymentsRepository)))
-            .CreateClient();
-
         var currentDate = DateTime.Now;
-        var request = new PostPaymentRequest
-        {
-            CardNumber = "1234567812345678",
-            ExpiryMonth = currentDate.Month,
-            ExpiryYear = currentDate.Year,
-            Currency = "GBP",
-            Amount = 1000,
-            Cvv = 123
-        };
+        var request = CreateValidPaymentRequest(expiryMonth: currentDate.Month, expiryYear: currentDate.Year);
 
         // Act
-        var response = await client.PostAsJsonAsync($"/api/Payments", request);
-        var errorResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string[]>>();
+        var response = await _client.PostAsJsonAsync($"/api/Payments", request);
 
         // Assert
+        await AssertValidationErrorAsync(response, "ExpiryYear", "Card expiry must be in the future.");
+    }
+
+    private PostPaymentRequest CreateValidPaymentRequest(
+        string cardNumber = "1234567812345678",
+        int expiryMonth = 12,
+        int? expiryYear = null,
+        string currency = "GBP",
+        int amount = 1000,
+        int cvv = 123)
+    {
+        return new PostPaymentRequest
+        {
+            CardNumber = cardNumber,
+            ExpiryMonth = expiryMonth,
+            ExpiryYear = expiryYear ?? DateTime.Now.Year + 1,
+            Currency = currency,
+            Amount = amount,
+            Cvv = cvv
+        };
+    }
+
+    private static async Task AssertValidationErrorAsync(
+        HttpResponseMessage response,
+        string fieldName,
+        string expectedMessage)
+    {
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
+
+        var errorResponse = await response.Content.ReadFromJsonAsync<Dictionary<string, string[]>>();
+
         Assert.That(errorResponse, Is.Not.Null);
-        Assert.That(errorResponse, Contains.Key("ExpiryYear"));
-        var expiryErrors = errorResponse["ExpiryYear"];
-        Assert.That(expiryErrors, Contains.Item("Card expiry must be in the future."));
+        Assert.That(errorResponse, Contains.Key(fieldName));
+        var fieldErrors = errorResponse[fieldName];
+        Assert.That(fieldErrors, Contains.Item(expectedMessage));
     }
 }
