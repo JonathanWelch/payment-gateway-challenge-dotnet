@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using PaymentGateway.Api.Core;
+using PaymentGateway.Api.Infrastructure;
 using PaymentGateway.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,8 +22,15 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddHttpClient("AcquiringBankClient", client =>
+{
+    var bankApiConfig = builder.Configuration.GetSection("AcquiringBank");
+    client.BaseAddress = new Uri(bankApiConfig["BaseUrl"]!);
+});
+
 builder.Services.AddSingleton<PaymentsRepository>();
 builder.Services.AddScoped<IPaymentsService, PaymentsService>();
+builder.Services.AddScoped<IAcquiringBank, AcquiringBankClient>();
 
 var app = builder.Build();
 

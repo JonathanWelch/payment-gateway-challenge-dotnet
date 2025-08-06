@@ -1,4 +1,5 @@
-﻿using PaymentGateway.Api.Models;
+﻿using PaymentGateway.Api.Core;
+using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Models.Requests;
 using PaymentGateway.Api.Models.Responses;
 
@@ -7,10 +8,12 @@ namespace PaymentGateway.Api.Services;
 public class PaymentsService : IPaymentsService
 {
     private readonly PaymentsRepository _paymentsRepository;
+    private readonly IAcquiringBank _acquiringBank;
 
-    public PaymentsService(PaymentsRepository paymentsRepository)
+    public PaymentsService(PaymentsRepository paymentsRepository, IAcquiringBank acquiringBank)
     {
         _paymentsRepository = paymentsRepository;
+        _acquiringBank = acquiringBank;
     }
 
     public async Task<PostPaymentResponse?> GetPaymentAsync(Guid id)
@@ -20,16 +23,36 @@ public class PaymentsService : IPaymentsService
 
     public async Task<PostPaymentResponse> CreatePaymentAsync(PostPaymentRequest paymentRequest)
     {
+        var request = new PaymentRequest()
+        {
+            Amount = paymentRequest.Amount,
+            CardNumber = paymentRequest.CardNumber,
+            Currency = paymentRequest.Currency,
+            ExpiryDate = $"{paymentRequest.ExpiryMonth:D2}/{paymentRequest.ExpiryYear}",
+            Cvv = paymentRequest.Cvv.ToString()
+        };
+
+        PaymentResult paymentResult = await _acquiringBank.ProcessPaymentAsync(request);
+
+        PaymentStatus status = paymentResult.IsSuccess
+            ? paymentResult.Authorized ? PaymentStatus.Authorized : PaymentStatus.Declined
+            : PaymentStatus.Rejected;
+
         var response = new PostPaymentResponse
         {
             Id = Guid.NewGuid(),
             ExpiryYear = paymentRequest.ExpiryYear,
             ExpiryMonth = paymentRequest.ExpiryMonth,
             Amount = paymentRequest.Amount,
-            CardNumberLastFour = Int32.Parse(paymentRequest.CardNumber[^4..]),
+            CardNumberLastFour = int.Parse(paymentRequest.CardNumber[^4..]),
             Currency = paymentRequest.Currency,
-            Status = PaymentStatus.Authorized
+            Status = status
         };
+
+        if (status == PaymentStatus.Rejected)
+        {
+            return response;
+        }
 
         _paymentsRepository.Add(response);
 

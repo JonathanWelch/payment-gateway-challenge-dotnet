@@ -2,8 +2,9 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
-
+using Moq;
 using PaymentGateway.Api.Controllers;
+using PaymentGateway.Api.Core;
 using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Models.Requests;
 using PaymentGateway.Api.Models.Responses;
@@ -22,12 +23,25 @@ public class PaymentsControllerTests
     [SetUp]
     public void SetUp()
     {
+        var mockBankService = new Mock<IAcquiringBank>();
+        var authorizationCode = Guid.NewGuid().ToString();
+
+        mockBankService
+            .Setup(x => x.ProcessPaymentAsync(It.IsAny<PaymentRequest>()))
+            .ReturnsAsync(new PaymentResult
+            {
+                IsSuccess = true,
+                Authorized = true,
+                AuthorizationCode = authorizationCode
+            });
+
         _paymentsRepository = new PaymentsRepository();
         _webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         _client = _webApplicationFactory.WithWebHostBuilder(builder =>
                 builder.ConfigureServices(services => ((ServiceCollection)services)
                     .AddSingleton(_paymentsRepository)
-                    .AddScoped<IPaymentsService, PaymentsService>()))
+                    .AddScoped<IPaymentsService, PaymentsService>()
+                    .AddSingleton(mockBankService.Object)))
             .CreateClient();
     }
 
