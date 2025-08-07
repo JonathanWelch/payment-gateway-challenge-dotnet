@@ -1,8 +1,11 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
+
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+
 using Moq;
+
 using PaymentGateway.Api.Controllers;
 using PaymentGateway.Api.Core;
 using PaymentGateway.Api.Models;
@@ -10,7 +13,7 @@ using PaymentGateway.Api.Models.Requests;
 using PaymentGateway.Api.Models.Responses;
 using PaymentGateway.Api.Services;
 
-namespace PaymentGateway.Api.Tests;
+namespace PaymentGateway.Api.Tests.Integration.Controllers;
 
 [TestFixture]
 public class PaymentsControllerTests
@@ -39,7 +42,7 @@ public class PaymentsControllerTests
         _webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         _client = _webApplicationFactory.WithWebHostBuilder(builder =>
                 builder.ConfigureServices(services => ((ServiceCollection)services)
-                    .AddSingleton(_paymentsRepository)
+                    .AddSingleton<IPaymentsRepository>(_paymentsRepository)
                     .AddScoped<IPaymentsService, PaymentsService>()
                     .AddSingleton(mockBankService.Object)))
             .CreateClient();
@@ -285,14 +288,15 @@ public class PaymentsControllerTests
         var httpPostResponse = await _client.PostAsJsonAsync($"/api/Payments", paymentRequest);
         var postPaymentResponse = await httpPostResponse.Content.ReadFromJsonAsync<PostPaymentResponse>();
 
-        var httpGetResponse = await _client.GetAsync($"/api/Payments/{postPaymentResponse.Id}");
+        Assert.That(postPaymentResponse, Is.Not.Null);
+        var httpGetResponse = await _client.GetAsync($"/api/Payments/{postPaymentResponse!.Id}");
         var paymentResponse = await httpGetResponse.Content.ReadFromJsonAsync<PostPaymentResponse>();
 
         // Assert
         Assert.That(httpPostResponse.StatusCode, Is.EqualTo(HttpStatusCode.Created));
         Assert.That(httpGetResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         Assert.That(paymentResponse, Is.Not.Null);
-        Assert.That(paymentResponse.Id, Is.Not.EqualTo(Guid.Empty));
+        Assert.That(paymentResponse!.Id, Is.Not.EqualTo(Guid.Empty));
         Assert.That(paymentResponse.Amount, Is.EqualTo(paymentRequest.Amount));
         int expectedCardNumberLastFour = 5678;
         Assert.That(paymentResponse.CardNumberLastFour, Is.EqualTo(expectedCardNumberLastFour));
@@ -302,7 +306,7 @@ public class PaymentsControllerTests
         Assert.That(paymentResponse.Status, Is.EqualTo(PaymentStatus.Authorized));
     }
 
-    private PostPaymentRequest CreateValidPaymentRequest(
+    private static PostPaymentRequest CreateValidPaymentRequest(
         string cardNumber = "1234567812345678",
         int expiryMonth = 12,
         int? expiryYear = null,
@@ -321,10 +325,7 @@ public class PaymentsControllerTests
         };
     }
 
-    private static async Task AssertValidationErrorAsync(
-        HttpResponseMessage response,
-        string fieldName,
-        string expectedMessage)
+    private static async Task AssertValidationErrorAsync(HttpResponseMessage response, string fieldName, string expectedMessage)
     {
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
 
@@ -332,7 +333,7 @@ public class PaymentsControllerTests
 
         Assert.That(errorResponse, Is.Not.Null);
         Assert.That(errorResponse, Contains.Key(fieldName));
-        var fieldErrors = errorResponse[fieldName];
+        var fieldErrors = errorResponse![fieldName];
         Assert.That(fieldErrors, Contains.Item(expectedMessage));
     }
 }
