@@ -19,9 +19,9 @@ namespace PaymentGateway.Api.Tests.Integration.Controllers;
 public class PaymentsControllerTests
 {
     private readonly Random _random = new();
-    private PaymentsRepository _paymentsRepository;
-    private WebApplicationFactory<PaymentsController> _webApplicationFactory;
-    private HttpClient _client;
+    private PaymentsRepository _paymentsRepository = null!;
+    private WebApplicationFactory<PaymentsController> _webApplicationFactory = null!;
+    private HttpClient _client = null!;
 
     [SetUp]
     public void SetUp()
@@ -56,7 +56,7 @@ public class PaymentsControllerTests
     }
 
     [Test]
-    public async Task RetrievesAPaymentSuccessfully()
+    public async Task CanRetrievePayment_WithCorrectDetails()
     {
         // Arrange
         var payment = new PostPaymentResponse
@@ -66,7 +66,8 @@ public class PaymentsControllerTests
             ExpiryMonth = _random.Next(1, 12),
             Amount = _random.Next(1, 10000),
             CardNumberLastFour = _random.Next(1111, 9999),
-            Currency = "GBP"
+            Currency = "GBP",
+            Status = PaymentStatus.Authorized
         };
 
         _paymentsRepository.Add(payment);
@@ -78,6 +79,12 @@ public class PaymentsControllerTests
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         Assert.That(paymentResponse, Is.Not.Null);
+        Assert.That(paymentResponse.Amount, Is.EqualTo(payment.Amount));
+        Assert.That(paymentResponse.CardNumberLastFour, Is.EqualTo(payment.CardNumberLastFour));
+        Assert.That(paymentResponse.ExpiryMonth, Is.EqualTo(payment.ExpiryMonth));
+        Assert.That(paymentResponse.ExpiryYear, Is.EqualTo(payment.ExpiryYear));
+        Assert.That(paymentResponse.Currency, Is.EqualTo(payment.Currency));
+        Assert.That(paymentResponse.Status, Is.EqualTo(payment.Status));
     }
 
     [Test]
@@ -93,7 +100,7 @@ public class PaymentsControllerTests
     [TestCase("GBP")]
     [TestCase("USD")]
     [TestCase("EUR")]
-    public async Task CreatesPaymentSuccessfully(string validCurrency)
+    public async Task CanCreatePayment_WithCorrectDetails(string validCurrency)
     {
         // Arrange
         var paymentRequest = CreateValidPaymentRequest(currency: validCurrency);
@@ -105,7 +112,7 @@ public class PaymentsControllerTests
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created));
         Assert.That(paymentResponse, Is.Not.Null);
-        Assert.That(paymentResponse.Id, Is.Not.EqualTo(Guid.Empty));
+        Assert.That(paymentResponse!.Id, Is.Not.EqualTo(Guid.Empty));
         Assert.That(paymentResponse.Amount, Is.EqualTo(paymentRequest.Amount));
         int expectedCardNumberLastFour = 5678;
         Assert.That(paymentResponse.CardNumberLastFour, Is.EqualTo(expectedCardNumberLastFour));
@@ -279,7 +286,7 @@ public class PaymentsControllerTests
     }
 
     [Test]
-    public async Task CreatesAndRetrievePaymentSuccessfully()
+    public async Task CanCreateAndRetrievePayment_WithCorrectDetails()
     {
         // Arrange
         var paymentRequest = CreateValidPaymentRequest();
