@@ -21,7 +21,6 @@ public class FutureExpiryDateAttribute : ValidationAttribute
         var currentYear = currentDate.Year;
         var currentMonth = currentDate.Month;
 
-        // Check if expiry year is in the past
         if ((request.ExpiryYear < currentYear) || (request.ExpiryYear == currentYear && request.ExpiryMonth <= currentMonth))
         {
             return new ValidationResult("Card expiry must be in the future.", new[] { nameof(request.ExpiryYear) });
