@@ -7,10 +7,10 @@ namespace PaymentGateway.Api.Services;
 
 public class PaymentsService : IPaymentsService
 {
-    private readonly PaymentsRepository _paymentsRepository;
+    private readonly IPaymentsRepository _paymentsRepository;
     private readonly IAcquiringBank _acquiringBank;
 
-    public PaymentsService(PaymentsRepository paymentsRepository, IAcquiringBank acquiringBank)
+    public PaymentsService(IPaymentsRepository paymentsRepository, IAcquiringBank acquiringBank)
     {
         _paymentsRepository = paymentsRepository;
         _acquiringBank = acquiringBank;
