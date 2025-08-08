@@ -27,6 +27,6 @@ public class PostPaymentRequest
     public int Amount { get; set; }
 
     [Required(ErrorMessage = "CVV is required.")]
-    [Range(100, 9999, ErrorMessage = "CVV must be 3-4 characters long.")]
-    public int Cvv { get; set; }
+    [StringLength(4, MinimumLength = 3, ErrorMessage = "CVV must be 3-4 characters long.")]
+    public string Cvv { get; set; }
 }

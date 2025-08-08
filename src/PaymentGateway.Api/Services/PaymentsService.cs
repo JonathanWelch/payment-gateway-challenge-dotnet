@@ -29,7 +29,7 @@ public class PaymentsService : IPaymentsService
             CardNumber = paymentRequest.CardNumber,
             Currency = paymentRequest.Currency,
             ExpiryDate = $"{paymentRequest.ExpiryMonth:D2}/{paymentRequest.ExpiryYear}",
-            Cvv = paymentRequest.Cvv.ToString()
+            Cvv = paymentRequest.Cvv
         };
 
         PaymentResult paymentResult = await _acquiringBank.ProcessPaymentAsync(request);

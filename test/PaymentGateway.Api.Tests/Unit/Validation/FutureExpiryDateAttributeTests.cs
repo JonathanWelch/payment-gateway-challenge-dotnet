@@ -118,7 +118,7 @@ public class FutureExpiryDateAttributeTests
         int expiryYear = TestValidFutureYear,
         string currency = "GBP",
         int amount = 1000,
-        int cvv = 123)
+        string cvv = "123")
     {
         return new PostPaymentRequest
         {

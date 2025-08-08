@@ -58,7 +58,7 @@ public class PaymentsController : ControllerBase
     ///         "expiryYear": 2025,
     ///         "currency": "GBP",
     ///         "amount": 1000,
-    ///         "cvv": 123
+    ///         "cvv":"123"
     ///     }
     /// 
     /// Amount should be in the minor currency unit.  For example, if the currency was USD then $0.01 would be supplied as 1 and $10.50 would be supplied as 1050.

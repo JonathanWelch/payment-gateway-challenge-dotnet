@@ -167,7 +167,7 @@ public class PaymentsServiceTests
         string cardNumber = "4321432143214321";
         string currency = "GBP";
         int amount = 1000;
-        int cvv = 123;
+        string cvv = "123";
 
         PostPaymentRequest postPaymentRequest = new()
         {

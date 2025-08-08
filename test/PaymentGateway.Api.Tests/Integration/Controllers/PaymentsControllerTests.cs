@@ -163,7 +163,7 @@ public class PaymentsControllerTests
             ExpiryYear = 2025,
             Currency = "GBP",
             Amount = 1000,
-            Cvv = 123
+            Cvv = "123"
         };
 
         // Act
@@ -184,7 +184,7 @@ public class PaymentsControllerTests
             ExpiryYear = 2025,
             Currency = "GBP",
             Amount = 1000,
-            Cvv = 123
+            Cvv = "123"
         };
 
         // Act
@@ -247,7 +247,7 @@ public class PaymentsControllerTests
             ExpiryMonth = 12,
             ExpiryYear = 2025,
             Currency = "GBP",
-            Cvv = 123
+            Cvv = "123"
         };
 
         // Act
@@ -319,7 +319,7 @@ public class PaymentsControllerTests
         int? expiryYear = null,
         string currency = "GBP",
         int amount = 1000,
-        int cvv = 123)
+        string cvv = "123")
     {
         return new PostPaymentRequest
         {
