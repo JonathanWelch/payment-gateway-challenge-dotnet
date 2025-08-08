@@ -39,6 +39,7 @@ builder.Services.AddHttpClient("AcquiringBankClient", client =>
     client.BaseAddress = new Uri(bankApiConfig["BaseUrl"]!);
 });
 
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddSingleton<IPaymentsRepository, PaymentsRepository>();
 builder.Services.AddScoped<IPaymentsService, PaymentsService>();
 builder.Services.AddScoped<IAcquiringBank, AcquiringBankClient>();

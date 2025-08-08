@@ -17,7 +17,8 @@ public class FutureExpiryDateAttribute : ValidationAttribute
             return new ValidationResult("Invalid object type for expiry date validation.");
         }
 
-        var currentDate = DateTime.Now;
+        var timeProvider = (TimeProvider?)validationContext.GetService(typeof(TimeProvider)) ?? TimeProvider.System;
+        var currentDate = timeProvider.GetLocalNow().DateTime;
         var currentYear = currentDate.Year;
         var currentMonth = currentDate.Month;
 
